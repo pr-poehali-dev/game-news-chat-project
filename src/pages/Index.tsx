@@ -3,6 +3,8 @@ import Navigation from '@/components/Navigation';
 import HomePage from '@/components/HomePage';
 import ChatSection from '@/components/ChatSection';
 import ProfileSection from '@/components/ProfileSection';
+import ModelLoader from '@/components/ModelLoader';
+import { generateResponse, isModelLoaded } from '@/lib/llama';
 
 interface Message {
   id: string;
@@ -25,11 +27,12 @@ const Index = () => {
   const [userInput, setUserInput] = useState('');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [userAchievements, setUserAchievements] = useState<string[]>([]);
+  const [modelLoaded, setModelLoaded] = useState(false);
 
   const bots = [
-    { name: 'CyberBot', color: 'from-purple-500 to-pink-500' },
-    { name: 'NeonAI', color: 'from-blue-500 to-cyan-500' },
-    { name: 'PixelMind', color: 'from-orange-500 to-red-500' }
+    { name: 'Максим', color: 'from-purple-500 to-pink-500' },
+    { name: 'Анна', color: 'from-blue-500 to-cyan-500' },
+    { name: 'Дмитрий', color: 'from-orange-500 to-red-500' }
   ];
 
   const newsItems = [
@@ -56,6 +59,78 @@ const Index = () => {
       date: '28 ноября 2024',
       excerpt: 'CD Projekt RED выпустила масштабное обновление, которое улучшает производительность на 40%...',
       image: '🌃'
+    },
+    {
+      id: 4,
+      title: 'Half-Life 3 случайно засветился в Steam',
+      category: 'Слухи',
+      date: '29 ноября 2024',
+      excerpt: 'В базе данных Steam обнаружена страница игры с кодовым названием HLX. Valve хранит молчание...',
+      image: '👀'
+    },
+    {
+      id: 5,
+      title: 'Minecraft получит глобальное обновление физики',
+      category: 'Обновления',
+      date: '28 ноября 2024',
+      excerpt: 'Mojang анонсировала революционную систему физики блоков. Релиз намечен на весну 2025 года...',
+      image: '🧱'
+    },
+    {
+      id: 6,
+      title: 'Fortnite побил рекорд онлайна',
+      category: 'Новости',
+      date: '27 ноября 2024',
+      excerpt: 'Во время события "Chapter 5" одновременно играло 15 миллионов человек по всему миру...',
+      image: '🏆'
+    },
+    {
+      id: 7,
+      title: 'Игроки запустили Crysis на умном тостере',
+      category: 'Новости',
+      date: '27 ноября 2024',
+      excerpt: 'Моддеры адаптировали легендарный шутер для работы на IoT-устройствах с экраном...',
+      image: '🍞'
+    },
+    {
+      id: 8,
+      title: 'Nintendo Switch 2: первые подробности',
+      category: 'Анонсы',
+      date: '26 ноября 2024',
+      excerpt: 'Инсайдеры сообщают о поддержке 4K и увеличенном экране. Анонс ожидается в начале 2025...',
+      image: '🎮'
+    },
+    {
+      id: 9,
+      title: 'Terraria обойдёт Minecraft по продажам?',
+      category: 'Аналитика',
+      date: '26 ноября 2024',
+      excerpt: 'Экспертные прогнозы показывают рост популярности 2D-песочницы на 200% за последний год...',
+      image: '📊'
+    },
+    {
+      id: 10,
+      title: 'CS2: новая операция и карты из CS 1.6',
+      category: 'Обновления',
+      date: '25 ноября 2024',
+      excerpt: 'Valve выпустила операцию "Возвращение легенд" с ремастерами классических карт...',
+      image: '🔫'
+    },
+    {
+      id: 11,
+      title: 'Elden Ring DLC Shadow of the Erdtree бьёт рекорды',
+      category: 'Новости',
+      date: '25 ноября 2024',
+      excerpt: 'Дополнение собрало 10/10 от IGN и продалось тиражом 5 миллионов копий за неделю...',
+      image: '⚔️'
+    },
+    {
+      id: 12,
+      title: 'Dota 2: призовой фонд TI достиг 50 млн долларов',
+      category: 'Киберспорт',
+      date: '24 ноября 2024',
+      excerpt: 'The International 2025 стал самым крупным турниром в истории киберспорта...',
+      image: '💰'
     }
   ];
 
@@ -72,7 +147,7 @@ const Index = () => {
     const initialMessages: Message[] = [
       {
         id: '1',
-        author: 'CyberBot',
+        author: 'Максим',
         text: 'Привет всем! Кто-нибудь пробовал новый патч для Cyberpunk?',
         timestamp: new Date(Date.now() - 300000),
         isBot: true,
@@ -80,7 +155,7 @@ const Index = () => {
       },
       {
         id: '2',
-        author: 'NeonAI',
+        author: 'Анна',
         text: 'Да! Производительность заметно улучшилась 🚀',
         timestamp: new Date(Date.now() - 240000),
         isBot: true,
@@ -88,7 +163,7 @@ const Index = () => {
       },
       {
         id: '3',
-        author: 'PixelMind',
+        author: 'Дмитрий',
         text: 'А я жду GTA VI! Кто со мной?',
         timestamp: new Date(Date.now() - 180000),
         isBot: true,
@@ -122,7 +197,7 @@ const Index = () => {
     return () => clearInterval(botChatInterval);
   }, []);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!userInput.trim()) return;
 
     const mentionMatch = userInput.match(/@(\w+)/g);
@@ -142,21 +217,44 @@ const Index = () => {
       setUserAchievements(prev => [...prev, 'Активный участник']);
     }
 
+    const currentInput = userInput;
+    setUserInput('');
+
     setTimeout(() => {
       bots.forEach((bot, index) => {
-        setTimeout(() => {
-          const responses = [
-            `Интересная мысль! 🎮`,
-            `Полностью согласен с тобой!`,
-            `Отличный вопрос! Дай подумаю...`,
-            `Это точно! 💯`,
-            `Ха-ха, классно сказано!`
-          ];
+        setTimeout(async () => {
+          let responseText = '';
+          
+          if (isModelLoaded()) {
+            try {
+              const prompt = `Ты ${bot.name}, участник игрового чата. Игрок сказал: "${currentInput}". Ответь коротко и дружелюбно на тему игр:`;
+              const generatedText = await generateResponse(prompt, 30);
+              responseText = `@Игрок ${generatedText}`;
+            } catch (error) {
+              const fallbackResponses = [
+                `Интересная мысль! 🎮`,
+                `Полностью согласен с тобой!`,
+                `Отличный вопрос! Дай подумаю...`,
+                `Это точно! 💯`,
+                `Ха-ха, классно сказано!`
+              ];
+              responseText = `@Игрок ${fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)]}`;
+            }
+          } else {
+            const fallbackResponses = [
+              `Интересная мысль! 🎮`,
+              `Полностью согласен с тобой!`,
+              `Отличный вопрос! Дай подумаю...`,
+              `Это точно! 💯`,
+              `Ха-ха, классно сказано!`
+            ];
+            responseText = `@Игрок ${fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)]}`;
+          }
           
           const botResponse: Message = {
             id: `${Date.now()}-${index}`,
             author: bot.name,
-            text: `@Игрок ${responses[Math.floor(Math.random() * responses.length)]}`,
+            text: responseText,
             timestamp: new Date(),
             isBot: true,
             avatarColor: bot.color
@@ -170,11 +268,9 @@ const Index = () => {
             text: `${bot.name} упомянул вас`
           };
           setNotifications(prev => [...prev, notification]);
-        }, index * 1000);
+        }, index * 1500);
       });
     }, 500);
-
-    setUserInput('');
   };
 
   const formatTime = (date: Date) => {
@@ -196,7 +292,9 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      {!modelLoaded && <ModelLoader onLoadComplete={() => setModelLoaded(true)} />}
+      <div className="min-h-screen bg-background">
       <Navigation 
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -232,6 +330,7 @@ const Index = () => {
         )}
       </main>
     </div>
+    </>
   );
 };
 
